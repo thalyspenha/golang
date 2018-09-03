@@ -2,6 +2,7 @@ package model
 
 import (
 	"database/sql"
+	"strings"
 )
 
 //Cliente estrutura
@@ -44,38 +45,72 @@ func (c *Cliente) UpdateCliente(db *sql.DB) error {
 }
 
 //GetCliente função get cliente
-func GetCliente() {
+func (c *Cliente) GetCliente(db *sql.DB) error {
+	err := db.QueryRow(`select id, nome, data_nascimento
+				from clientes
+				 where id = ? `, c.ID).Scan(&c.ID, &c.Nome, &c.DataNascimento)
+	if err != nil {
+		return err
+	}
+	return err
 
 }
 
 //GetClientes função get clientes
-func (c *Cliente) GetClientes(db *sql.DB) []Cliente {
+func (c *Cliente) GetClientes(db *sql.DB) ([]Cliente, error) {
+	var values []interface{}
+	var where []string
 
-	//smt, err := db.Prepare(`Select * from clientes `)
-	// if err != nil {
-	// 	return nil, err
+	where = append(where, "id != ? ")
+	values = append(values, 0)
+
+	if c.ID != 0 {
+		where = append(where, "id = ? ")
+		values = append(values, c.ID)
+	}
+
+	if c.DataNascimento != "" {
+		where = append(where, "data_nascimento = ? ")
+		values = append(values, c.DataNascimento)
+	}
+
+	// if c.Nome != "" {
+	// 	where = append(where, "nome = ? ")
+	// 	values = append(values, c.Nome)
 	// }
 
-	smt, err := db.Query(`Select * from clientes`)
-	//defer db.Close()
+	if c.Nome != "" {
+		where = append(where, "nome like ?")
+		//values = append(values, fmt.Sprintf("%%%", c.Nome, "%"))
+	}
 
-	//clientes, err := smt.Exec()
-	clientes := []Cliente{}
+	rows, err := db.Query(`select id, nome, data_nascimento
+					  from clientes
+					   where `+strings.Join(where, " and "), values...)
+
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
-	for smt.Next() {
-		var c Cliente
-		var nome sql.NullString
-		var dataNascimento sql.NullString
-		var id int64
+	clientes := []Cliente{}
+	defer rows.Close()
 
-		c.Nome = nome.String
-		c.DataNascimento = dataNascimento.String
-		c.ID = id
-		clientes = append(clientes, c)
+	for rows.Next() {
+		var cl Cliente
+		if err := rows.Scan(&cl.ID, &cl.Nome, &cl.DataNascimento); err != nil {
+			return nil, err
+		}
+		clientes = append(clientes, cl)
 	}
+	return clientes, nil
+}
 
-	return clientes
+//DeleteCliente ...
+func (c *Cliente) DeleteCliente(db *sql.DB) error {
+	smt, err := db.Prepare(`delete from clientes where id = ? `)
+	if err != nil {
+		return err
+	}
+	_, err = smt.Exec(c.ID)
+	return err
 }

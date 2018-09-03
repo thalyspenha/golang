@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"database/sql"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -43,12 +44,6 @@ func GravaCliente(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	t.ResponseWithJSON(w, http.StatusOK, c, 0, 0)
-
-	// body, err := ioutil.ReadAll(r.Body)
-	// if err != nil {
-	// 	panic(err)
-	// }
-
 	log.Println(c)
 
 }
@@ -97,8 +92,15 @@ func GetClientes(w http.ResponseWriter, r *http.Request) {
 	err := d.Connection()
 	db := d.DB
 	defer db.Close()
+	id, _ := strconv.Atoi(r.FormValue("id"))
+	nome := r.FormValue("nome")
+	dataNascimento := r.FormValue("datanascimento")
 
-	clientes := c.GetClientes(db)
+	c.ID = int64(id)
+	c.Nome = nome
+	c.DataNascimento = dataNascimento
+
+	clientes, err := c.GetClientes(db)
 
 	if err != nil {
 		t.ResponseWithError(w, http.StatusInternalServerError, err.Error(), "")
@@ -106,4 +108,77 @@ func GetClientes(w http.ResponseWriter, r *http.Request) {
 	}
 	t.ResponseWithJSON(w, http.StatusOK, clientes, 0, 0)
 
+}
+
+//DeleteCliente ...
+func DeleteCliente(w http.ResponseWriter, r *http.Request) {
+	var c model.Cliente
+	var d db.DB
+	var t util.App
+
+	err := d.Connection()
+
+	if err != nil {
+		t.ResponseWithError(w, http.StatusInternalServerError, "Erro ao tentar abrir conexão", "Teste")
+	}
+	db := d.DB
+	defer db.Close()
+	vars := mux.Vars(r)
+	id, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		t.ResponseWithError(w, http.StatusBadRequest, "Invalid id", "")
+		return
+	}
+
+	c.ID = int64(id)
+	if err := c.DeleteCliente(db); err != nil {
+		t.ResponseWithError(w, http.StatusInternalServerError, err.Error(), "")
+		return
+	}
+	t.ResponseWithJSON(w, http.StatusOK, c, 0, 0)
+	//log.Println(string(""))
+
+}
+
+//GetCliente ...
+func GetCliente(w http.ResponseWriter, r *http.Request) {
+	var c model.Cliente
+	var d db.DB
+	var t util.App
+
+	err := d.Connection()
+
+	if err != nil {
+		t.ResponseWithError(w, http.StatusInternalServerError, "Erro ao tentar abrir conexão", "Teste")
+	}
+	db := d.DB
+	defer db.Close()
+
+	err = db.Ping()
+	if err != nil {
+		t.ResponseWithError(w, http.StatusInternalServerError, "Erro ao tentar abrir conexão", "Teste")
+		return
+	}
+
+	vars := mux.Vars(r)
+	id, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		t.ResponseWithError(w, http.StatusBadRequest, "Invalid id", "")
+		return
+	}
+
+	c.ID = int64(id)
+	if err := c.GetCliente(db); err != nil {
+		if err == sql.ErrNoRows {
+			log.Println("[handler/GetCliente] - Não existe cliente com este id", err.Error())
+			t.ResponseWithError(w, http.StatusNotFound, "Não existe cliente para este id", "id")
+		} else {
+			log.Println("[handler/GetCliente] - Erro ao tentar consultar cliente", err.Error())
+			t.ResponseWithError(w, http.StatusInternalServerError, err.Error(), "")
+			return
+		}
+
+	}
+	t.ResponseWithJSON(w, http.StatusOK, c, 0, 0)
+	//log.Println(string(""))
 }
